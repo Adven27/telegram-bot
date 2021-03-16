@@ -1,0 +1,5 @@
+<dataset>
+    <chats id="1" chat_id="11" data='{"wishList": {"items": [{"url": "http"}]}}' blocked="false"/>
+    <chats id="2" chat_id="22" data='{"wishList": {"items": [{"url": "http1"}, {"url": "http2"}]}}' blocked="false"/>
+    <chats id="3" chat_id="33" data='{}' blocked="true"/>
+</dataset>

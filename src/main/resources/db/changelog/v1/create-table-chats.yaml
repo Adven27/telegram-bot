@@ -1,0 +1,52 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-table-chats
+      author: mamot
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: chats
+      changes:
+        - createTable:
+            tableName: chats
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: chats_pkey
+              - column:
+                  name: chat_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: chats_chat_uq
+              - column:
+                  name: data
+                  type: JSONB
+                  defaultValue: {}
+                  constraints:
+                    nullable: false
+              - column:
+                  name: blocked
+                  type: boolean
+                  defaultValue: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created
+                  type: timestamp without time zone
+                  defaultValue: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated
+                  type: timestamp without time zone
+                  defaultValue: now()
+                  constraints:
+                    nullable: false

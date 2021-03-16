@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-table-scripts
+      author: mamot
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: scripts
+      changes:
+        - createTable:
+            tableName: scripts
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: scripts_pkey
+              - column:
+                  name: pattern
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+                    unique: true
+                    uniqueConstraintName: scripts_pattern_uq
+              - column:
+                  name: script
+                  type: VARCHAR(2550)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false

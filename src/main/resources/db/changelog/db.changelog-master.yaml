@@ -1,0 +1,5 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/v1/create-table-chats.yaml
+  - include:
+      file: db/changelog/v1/create-table-scripts.yaml
