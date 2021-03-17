@@ -11,10 +11,12 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.pengrad.telegrambot.TelegramBot
 import com.pengrad.telegrambot.UpdatesListener
+import com.pengrad.telegrambot.model.CallbackQuery
 import com.pengrad.telegrambot.model.Message
 import com.pengrad.telegrambot.model.Update
-import io.adven27.telegram.bots.Bot
-import io.adven27.telegram.bots.send
+import com.pengrad.telegrambot.model.request.InlineKeyboardButton
+import com.pengrad.telegrambot.model.request.InlineKeyboardMarkup
+import io.adven27.telegram.bots.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -24,6 +26,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import org.testcontainers.shaded.org.apache.commons.lang.StringEscapeUtils
+import java.util.*
 import kotlin.concurrent.fixedRateTimer
 
 @Service
@@ -74,15 +77,86 @@ class Watcher(
     }
 
     private fun TelegramBot.handle(updates: MutableList<Update>): Int {
-        updates.map { it.message() }.forEach { msg ->
+        updates.forEach {
             when {
-                msg.text().startsWith("http") -> follow(msg)
-                msg.chat().id() == admin && msg.text().startsWith("/db") -> db(msg)
-                msg.chat().id() == admin && dbWizard.inProgress() -> dbInProgress(msg)
+                it.callbackQuery() != null -> handleCallback(it.callbackQuery())
+                it.message() != null -> handleMessage(it.message())
             }
         }
         return UpdatesListener.CONFIRMED_UPDATES_ALL
     }
+
+    private fun TelegramBot.handleMessage(msg: Message) {
+        val url = extractUrl(msg)
+        when {
+            url.isNotBlank() -> follow(url, msg)
+            msg.text().startsWith("/list") -> list(msg.chat().id())
+            msg.chat().id() == admin && msg.text().startsWith("/db") -> db(msg)
+            msg.chat().id() == admin && dbWizard.inProgress() -> dbInProgress(msg)
+        }
+    }
+
+    private fun extractUrl(msg: Message) =
+        "(http|https)://[a-zA-Z0-9\\-.]+\\.[a-zA-Z]{2,3}(/\\S*)?".toRegex()
+            .find(msg.text())?.groupValues?.get(0) ?: ""
+
+    private fun TelegramBot.handleCallback(cb: CallbackQuery) {
+        val chatId = cb.chatId()
+        val messageId = cb.messageId()
+        when {
+            cb.data() == "list" -> {
+                listItems(chatId).ifPresent { pair ->
+                    edit(chatId, messageId, "Вот за чем я слежу:") { it.replyMarkup(pair.second) }
+                }
+            }
+            cb.data().startsWith(CB_OPEN) -> {
+                val open = cb.data().substring(CB_OPEN.length)
+                chatRepository.findByChatId(chatId).map { info -> info.data.wishList?.items?.find { it.url == open } }
+                    .orElseThrow().also { item ->
+                        edit(chatId, messageId, "${item!!.name}\nЦена: ${item.price}\nКол-во: ${item.quantity}\n${item.url}") {
+                            it.replyMarkup(
+                                InlineKeyboardMarkup(
+                                    arrayOf(
+                                        InlineKeyboardButton("\uD83C\uDF10").url(item.url),
+                                        InlineKeyboardButton("❌").callbackData("del#${item.url}"),
+                                    ),
+                                    arrayOf(InlineKeyboardButton("<< back").callbackData("list"))
+                                )
+                            )
+                        }
+                    }
+            }
+            cb.data().startsWith(CB_DEL) -> {
+                val del = cb.data().substring(CB_DEL.length)
+                chatRepository.findByChatId(chatId).ifPresent { info ->
+                    val wishList = info.data.wishList!!
+                    chatRepository.save(
+                        info.apply {
+                            data = data.copy(wishList = wishList.copy(items = wishList.items.filter { it.url != del }
+                                .toSet()))
+                        }
+                    )
+                }
+                listItems(chatId).ifPresent { pair ->
+                    edit(chatId, messageId, "Вот за чем я слежу:") { it.replyMarkup(pair.second) }
+                }
+            }
+        }
+    }
+
+    private fun listItems(chatId: Long): Optional<Pair<String, InlineKeyboardMarkup>> =
+        chatRepository.findByChatId(chatId).map { chat ->
+            "Вот за чем я слежу:" to InlineKeyboardMarkup(
+                *chat.data.wishList?.items?.map { item -> item.toButtons() }?.toTypedArray() ?: emptyArray()
+            )
+        }
+
+    private fun TelegramBot.list(chatId: Long) = listItems(chatId).ifPresentOrElse(
+        { pair -> send(chatId, pair.first) { it.replyMarkup(pair.second) } },
+        { send(chatId, "Пока список пуст. Попробуй отправить мне ссылку.") }
+    )
+
+    private fun Item.toButtons() = arrayOf(InlineKeyboardButton("${name.take(25)} - $price").callbackData("$CB_OPEN$url"))
 
     private fun TelegramBot.dbInProgress(msg: Message) {
         if (dbWizard.finished()) {
@@ -103,12 +177,12 @@ class Watcher(
         )
     }
 
-    private fun TelegramBot.follow(msg: Message) {
-        val text = msg.text()
-        logger.info("URL to follow [$text]")
+    //TODO internal queue and retries
+    private fun TelegramBot.follow(url: String, msg: Message) {
+        logger.info("URL to follow [$url]")
         val chatId = msg.chat().id()
         try {
-            val result = fetch(text)
+            val result = fetch(url)
             chatRepository.findByChatId(chatId).ifPresentOrElse(
                 { chat ->
                     chatRepository.save(
@@ -120,7 +194,10 @@ class Watcher(
                 },
                 { chatRepository.save(Chat(chatId = chatId, data = ChatData(WishList(setOf(result))))) }
             )
-            send(chatId, "ОК! Буду следить.\nСейчас \"${result.name}\" стоит:\n${result.price}")
+            send(chatId, "ОК! Буду следить.\nСейчас \"${result.name}\" стоит:\n${result.price}") {
+                it.replyToMessageId(msg.messageId())
+                    .replyMarkup(InlineKeyboardMarkup(InlineKeyboardButton("Список").callbackData("list")))
+            }
         } catch (nf: ScriptNotFound) {
             send(chatId, "Извините... Пока не умею следить за такими ссылками ${nf.message}")
         } catch (e: Exception) {
@@ -129,7 +206,10 @@ class Watcher(
         }
     }
 
-    companion object : KLogging()
+    companion object : KLogging() {
+        const val CB_OPEN = "open#"
+        const val CB_DEL = "del#"
+    }
 }
 
 @Serializable

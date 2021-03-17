@@ -194,7 +194,7 @@ class WeatherPrinter(private val localisation: LocalizationService, private val 
         )
     }
 
-    //KTODO Fix hard code
+    //TODO Fix hard code
     fun printMamologda(language: String, json: org.json.JSONObject): String = if (isOkResp(json)) String.format(
         "Сегодня в Мамологде %s",
         convertCurrentWeatherToString(json)
