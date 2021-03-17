@@ -11,7 +11,6 @@ import io.adven27.telegram.bots.mamot.commands.LeaderBoardRepo.Record
 import io.adven27.telegram.bots.mamot.db.PGSQLRepo
 import io.adven27.telegram.bots.mamot.db.Repo
 import io.adven27.telegram.bots.mamot.legacy.CallbackCommand
-import io.adven27.telegram.bots.mamot.legacy.Game2048
 import mu.KLogging
 import org.json.JSONArray
 import org.json.JSONObject
@@ -171,8 +170,9 @@ class Game2048Command(private val repo: Repo, private val leaderBoard: LeaderBoa
     }
 }
 
-class Game20482 {
-    var tiles: Array<Tile?> = arrayOfNulls(4 * 4)
+
+class Game2048 {
+    lateinit var tiles: Array<Tile?>
     var isWin = false
     var isLose = false
     var score: Long = 0
@@ -211,7 +211,13 @@ class Game20482 {
         isLose = jsonObject.getBoolean("lose")
         tiles = arrayOfNulls(4 * 4)
         for (i in tiles.indices) {
-            tiles[i] = Tile(jsonObject.getJSONArray("tiles").getJSONObject(i).getInt("value"))
+            tiles[i] = Tile(
+                Optional.ofNullable(jsonObject.getJSONArray("tiles").optJSONObject(i)).map { it: JSONObject ->
+                    it.getInt(
+                        "value"
+                    )
+                }.orElse(0)
+            )
         }
     }
 
@@ -255,15 +261,15 @@ class Game20482 {
 
     private fun addTile() {
         val list = availableSpace()
-        if (availableSpace().isNotEmpty()) {
+        if (!availableSpace().isEmpty()) {
             val index = (Math.random() * list.size).toInt() % list.size
             val emptyTime = list[index]
-            emptyTime.value = if (Math.random() < 0.9) 2 else 4
+            emptyTime!!.value = if (Math.random() < 0.9) 2 else 4
         }
     }
 
-    private fun availableSpace(): List<Tile> {
-        val list: MutableList<Tile> = ArrayList(16)
+    private fun availableSpace(): List<Tile?> {
+        val list: MutableList<Tile?> = ArrayList(16)
         for (t in tiles) {
             if (t!!.empty()) {
                 list.add(t)
@@ -307,7 +313,7 @@ class Game20482 {
     }
 
     private fun rotate(angle: Int): Array<Tile?> {
-        val newTiles: Array<Tile?> = arrayOfNulls(4 * 4)
+        val newTiles = arrayOfNulls<Tile>(4 * 4)
         var offsetX = 3
         var offsetY = 3
         if (angle == 90) {
@@ -392,11 +398,14 @@ class Game20482 {
     }
 
     class Tile @JvmOverloads constructor(var value: Int = 0) {
-        fun empty(): Boolean = value == 0
+
+        fun empty(): Boolean {
+            return value == 0
+        }
     }
 
     companion object {
-        private fun ensureSize(l: MutableList<Tile?>, s: Int) {
+        private fun ensureSize(l: LinkedList<Tile?>, s: Int) {
             while (l.size != s) {
                 l.add(Tile())
             }
