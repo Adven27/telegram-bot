@@ -78,3 +78,9 @@ tasks.withType<KotlinCompile> {
 tasks.withType<Test> {
 	useJUnitPlatform()
 }
+
+tasks.withType<Jar> {
+	manifest {
+		attributes["Main-Class"] = "io.adven27.telegram.bots.ApplicationKt"
+	}
+}
