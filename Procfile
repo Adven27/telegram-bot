@@ -1,1 +1,0 @@
-worker: sh build/install/bin/bot
