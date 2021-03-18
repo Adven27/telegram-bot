@@ -97,6 +97,7 @@ class Watcher(
         val url = extractUrl(msg)
         when {
             url.isNotBlank() -> follow(url, msg)
+            msg.text().startsWith("/start") -> start(msg.chat().id())
             msg.text().startsWith("/list") -> list(msg.chat().id())
             msg.chat().id() == admin && msg.text().startsWith("/db") -> db(msg)
             msg.chat().id() == admin && msg.text().startsWith(DB_REMOVE) -> dbRemove(msg)
@@ -107,6 +108,10 @@ class Watcher(
     private fun extractUrl(msg: Message) =
         "(http|https)://[a-zA-Z0-9\\-.]+\\.[a-zA-Z]{2,3}(/\\S*)?".toRegex()
             .find(msg.text())?.groupValues?.get(0) ?: ""
+
+    private fun TelegramBot.start(chatId: Long) {
+        send(chatId, "Пришли мне ссылку на товар и я буду следить за изменением цены.")
+    }
 
     private fun TelegramBot.handleCallback(cb: CallbackQuery) {
         val chatId = cb.chatId()
