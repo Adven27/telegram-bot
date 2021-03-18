@@ -1,0 +1,1 @@
+web java -Dserver.port=$PORT $JAVA_OPTS -Dkotlin.script.classpath=build/libs/*.jar -jar build/libs/*.jar

@@ -9,6 +9,7 @@ import com.pengrad.telegrambot.request.SendMessage
 import com.pengrad.telegrambot.request.SendSticker
 import com.pengrad.telegrambot.response.BaseResponse
 import com.pengrad.telegrambot.response.SendResponse
+import io.adven27.telegram.bots.watcher.eval
 import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
@@ -16,6 +17,7 @@ import org.springframework.boot.runApplication
 @SpringBootApplication
 class TelegramBotApplication(var bots: List<Bot>?) : CommandLineRunner {
     override fun run(vararg args: String?) {
+        println("Scripting works: ${eval<Int>("1+1")}")
         bots?.forEach { it.start() }
     }
 }

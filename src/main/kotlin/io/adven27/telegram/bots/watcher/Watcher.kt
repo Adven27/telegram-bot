@@ -92,6 +92,7 @@ class Watcher(
             url.isNotBlank() -> follow(url, msg)
             msg.text().startsWith("/list") -> list(msg.chat().id())
             msg.chat().id() == admin && msg.text().startsWith("/db") -> db(msg)
+            msg.chat().id() == admin && msg.text().startsWith(DB_REMOVE) -> dbRemove(msg)
             msg.chat().id() == admin && dbWizard.inProgress() -> dbInProgress(msg)
         }
     }
@@ -113,7 +114,11 @@ class Watcher(
                 val open = cb.data().substring(CB_OPEN.length)
                 chatRepository.findByChatId(chatId).map { info -> info.data.wishList?.items?.find { it.url == open } }
                     .orElseThrow().also { item ->
-                        edit(chatId, messageId, "${item!!.name}\nЦена: ${item.price}\nКол-во: ${item.quantity}\n${item.url}") {
+                        edit(
+                            chatId,
+                            messageId,
+                            "${item!!.name}\nЦена: ${item.price}\nКол-во: ${item.quantity}\n${item.url}"
+                        ) {
                             it.replyMarkup(
                                 InlineKeyboardMarkup(
                                     arrayOf(
@@ -156,7 +161,8 @@ class Watcher(
         { send(chatId, "Пока список пуст. Попробуй отправить мне ссылку.") }
     )
 
-    private fun Item.toButtons() = arrayOf(InlineKeyboardButton("${name.take(25)} - $price").callbackData("$CB_OPEN$url"))
+    private fun Item.toButtons() =
+        arrayOf(InlineKeyboardButton("${name.take(25)} - $price").callbackData("$CB_OPEN$url"))
 
     private fun TelegramBot.dbInProgress(msg: Message) {
         if (dbWizard.finished()) {
@@ -175,6 +181,10 @@ class Watcher(
             scriptsRepository.findAll()
                 .joinToString(separator = "\n\n") { it.toString() } + "\n\n" + dbWizard.next("").msg
         )
+    }
+
+    private fun dbRemove(msg: Message) {
+        scriptsRepository.deleteById(msg.text().substring(DB_REMOVE.length + 1).toLong())
     }
 
     //TODO internal queue and retries
@@ -209,6 +219,7 @@ class Watcher(
     companion object : KLogging() {
         const val CB_OPEN = "open#"
         const val CB_DEL = "del#"
+        const val DB_REMOVE = "/db-remove"
     }
 }
 
