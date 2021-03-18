@@ -46,7 +46,7 @@ data class Chat(
 
     @Type(type = "jsonb")
     @Column(columnDefinition = "jsonb")
-    @Basic(fetch = FetchType.LAZY)
+    @Basic(fetch = FetchType.EAGER)
     var data: ChatData
 )
 

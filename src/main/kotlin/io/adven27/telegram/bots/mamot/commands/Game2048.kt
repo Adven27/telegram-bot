@@ -28,13 +28,13 @@ class Game2048Command(private val repo: Repo, private val leaderBoard: LeaderBoa
     override fun execute(bot: TelegramBot, user: User, chat: Chat, params: String?) {
         val userName = getUserName(user)
         if (userGames[userName] != null) {
-            bot.send(chat, screen(chat)) { it.replyMarkup(inlineKeyboard) }
+            bot.send(chat, screen(chat)) { replyMarkup(inlineKeyboard) }
             return
         }
         val g = Game2048()
         userGames[userName] = g
         repo.insert(userName, g.toJSON())
-        bot.send(chat, screen(chat)) { it.replyMarkup(inlineKeyboard) }
+        bot.send(chat, screen(chat)) { replyMarkup(inlineKeyboard) }
     }
 
     private fun getUserName(user: User): String = user.lastName()
@@ -127,7 +127,7 @@ class Game2048Command(private val repo: Repo, private val leaderBoard: LeaderBoa
         val data = cb.unsignedData()
         val from = cb.from()
         doAction(data, from)
-        bot.edit(message.chat(), message.messageId(), screen(message.chat())) { it.replyMarkup(inlineKeyboard) }
+        bot.edit(message.chat(), message.messageId(), screen(message.chat())) { replyMarkup(inlineKeyboard) }
         return true
     }
 

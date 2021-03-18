@@ -18,7 +18,7 @@ import java.util.*
 
 class WeatherCommand(private val weather: Weather) : MessageCommand("/weather", "current weather") {
     override fun execute(bot: TelegramBot, user: User, chat: Chat, params: String?) {
-        bot.send(chat.id(), print()) { it.disableWebPagePreview(true).parseMode(Markdown) }
+        bot.send(chat.id(), print()) { disableWebPagePreview(true).parseMode(Markdown) }
     }
 
     private fun print(): String = try {

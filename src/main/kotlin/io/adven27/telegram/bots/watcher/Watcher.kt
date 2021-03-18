@@ -46,11 +46,11 @@ class Watcher(
         logger.info("Starting Watcher...")
         with(TelegramBot(token)) {
             if (updateEnabled) {
-                fixedRateTimer("default", true, initialDelay =  0L, period = 1000 * 60 * rateMinutes) { updateItems() }
+                fixedRateTimer("default", true, initialDelay = 0L, period = 1000 * 60 * rateMinutes) { updateItems() }
             }
             setUpdatesListener { handle(it) }
         }
-        logger.info("Watcher stated")
+        logger.info("Watcher started")
     }
 
     private fun TelegramBot.updateItems() {
@@ -61,9 +61,11 @@ class Watcher(
                     chat.data
                         .let {
                             it.copy(
-                                wishList = WishList(it.wishList!!.items.map { (url, _, oldPrice) ->
-                                    fetch(url).apply { notify(chat.chatId, oldPrice, this) }
-                                }.fold(listOf<Item>()) { r, i -> r + i }.toSet())
+                                wishList = WishList(
+                                    it.wishList!!.items.map { item ->
+                                        fetch(item.url).apply { notify(chat.chatId, item.price, this) }
+                                    }.fold(listOf<Item>()) { r, i -> r + i }.toSet()
+                                )
                             )
                         }.let { chat.apply { data = it } }
                 )
@@ -119,23 +121,23 @@ class Watcher(
         when {
             cb.data() == "list" -> {
                 listItems(chatId).ifPresent { pair ->
-                    edit(chatId, messageId, "Вот за чем я слежу:") { it.replyMarkup(pair.second) }
+                    edit(chatId, messageId, "Вот за чем я слежу:") { replyMarkup(pair.second) }
                 }
             }
             cb.data().startsWith(CB_OPEN) -> {
-                val open = cb.data().substring(CB_OPEN.length)
-                chatRepository.findByChatId(chatId).map { info -> info.data.wishList?.items?.find { it.url == open } }
-                    .orElseThrow().also { item ->
+                val id = cb.targetId(CB_OPEN)
+                chatRepository.findByChatId(chatId).map { info -> info.data.wishList?.items?.find { it.id == id } }
+                    .map { item ->
                         edit(
                             chatId,
                             messageId,
                             "${item!!.name}\nЦена: ${item.price}\nКол-во: ${item.quantity}\n${item.url}"
                         ) {
-                            it.replyMarkup(
+                            replyMarkup(
                                 InlineKeyboardMarkup(
                                     arrayOf(
                                         InlineKeyboardButton("\uD83C\uDF10").url(item.url),
-                                        InlineKeyboardButton("❌").callbackData("del#${item.url}"),
+                                        InlineKeyboardButton("❌").callbackData("$CB_DEL${item.id}"),
                                     ),
                                     arrayOf(InlineKeyboardButton("<< back").callbackData("list"))
                                 )
@@ -144,22 +146,25 @@ class Watcher(
                     }
             }
             cb.data().startsWith(CB_DEL) -> {
-                val del = cb.data().substring(CB_DEL.length)
+                val id = cb.targetId(CB_DEL)
                 chatRepository.findByChatId(chatId).ifPresent { info ->
                     val wishList = info.data.wishList!!
                     chatRepository.save(
                         info.apply {
-                            data = data.copy(wishList = wishList.copy(items = wishList.items.filter { it.url != del }
-                                .toSet()))
+                            data = data.copy(
+                                wishList = wishList.copy(items = wishList.items.filter { it.id != id }.toSet())
+                            )
                         }
                     )
                 }
                 listItems(chatId).ifPresent { pair ->
-                    edit(chatId, messageId, "Вот за чем я слежу:") { it.replyMarkup(pair.second) }
+                    edit(chatId, messageId, "Вот за чем я слежу:") { replyMarkup(pair.second) }
                 }
             }
         }
     }
+
+    private fun CallbackQuery.targetId(anchor: String) = data().substring(anchor.length)
 
     private fun listItems(chatId: Long): Optional<Pair<String, InlineKeyboardMarkup>> =
         chatRepository.findByChatId(chatId).map { chat ->
@@ -169,12 +174,12 @@ class Watcher(
         }
 
     private fun TelegramBot.list(chatId: Long) = listItems(chatId).ifPresentOrElse(
-        { pair -> send(chatId, pair.first) { it.replyMarkup(pair.second) } },
+        { pair -> send(chatId, pair.first) { replyMarkup(pair.second) } },
         { send(chatId, "Пока список пуст. Попробуй отправить мне ссылку.") }
     )
 
     private fun Item.toButtons() =
-        arrayOf(InlineKeyboardButton("${name.take(25)} - $price").callbackData("$CB_OPEN$url"))
+        arrayOf(InlineKeyboardButton("${name.take(25)} - $price").callbackData("$CB_OPEN$id"))
 
     private fun TelegramBot.dbInProgress(msg: Message) {
         if (dbWizard.finished()) {
@@ -199,7 +204,6 @@ class Watcher(
         scriptsRepository.deleteById(msg.text().substring(DB_REMOVE.length + 1).toLong())
     }
 
-    //TODO internal queue and retries
     private fun TelegramBot.follow(url: String, msg: Message) {
         logger.info("URL to follow [$url]")
         val chatId = msg.chat().id()
@@ -217,7 +221,7 @@ class Watcher(
                 { chatRepository.save(Chat(chatId = chatId, data = ChatData(WishList(setOf(result))))) }
             )
             send(chatId, "ОК! Буду следить.\nСейчас \"${result.name}\" стоит:\n${result.price}") {
-                it.replyToMessageId(msg.messageId())
+                replyToMessageId(msg.messageId())
                     .replyMarkup(InlineKeyboardMarkup(InlineKeyboardButton("Список").callbackData("list")))
             }
         } catch (nf: ScriptNotFound) {
@@ -236,7 +240,13 @@ class Watcher(
 }
 
 @Serializable
-data class Item(val url: String, var name: String = "noname", var price: Double = 0.0, var quantity: Int = 0) {
+data class Item(
+    var id: String = UUID.randomUUID().toString(),
+    val url: String,
+    var name: String = "noname",
+    var price: Double = 0.0,
+    var quantity: Int = 0
+) {
     override fun equals(other: Any?): Boolean = when {
         this === other -> true
         javaClass != other?.javaClass -> false

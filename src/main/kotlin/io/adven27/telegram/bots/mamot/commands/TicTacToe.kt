@@ -13,7 +13,7 @@ class TicTacToeCommand : CallbackCommand("/ttt", "Try to beat me, skin bastard..
     private val game: TicTacToe = TicTacToe()
 
     override fun execute(bot: TelegramBot, user: User, chat: Chat, params: String?) {
-        bot.send(chat, game.toString()) { it.replyMarkup(keyboard) }
+        bot.send(chat, game.toString()) { replyMarkup(keyboard) }
     }
 
     override fun callback(bot: TelegramBot, cb: CallbackQuery): Boolean {
@@ -25,7 +25,7 @@ class TicTacToeCommand : CallbackCommand("/ttt", "Try to beat me, skin bastard..
                 return true
             }
         }
-        bot.edit(cb.chatId(), cb.messageId(), game.toString()) { it.replyMarkup(keyboard) }
+        bot.edit(cb.chatId(), cb.messageId(), game.toString()) { replyMarkup(keyboard) }
         return true
     }
 

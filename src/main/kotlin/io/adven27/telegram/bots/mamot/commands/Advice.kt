@@ -21,7 +21,7 @@ class AdviceCommand(private val messageFromURL: MessageFromURL) : MessageCommand
             text = "Связь с ноосферой потеряна..."
         }
         bot.send(chat.id(), sticker)
-        bot.send(chat, text) { it.disableWebPagePreview(true).parseMode(HTML) }
+        bot.send(chat, text) { disableWebPagePreview(true).parseMode(HTML) }
     }
 }
 

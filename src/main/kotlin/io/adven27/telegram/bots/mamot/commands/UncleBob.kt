@@ -34,7 +34,7 @@ class UncleBobCommand(private val printer: EntryPrinter) : MessageCommand("/uncl
     }
 
     private fun sendArticle(bot: TelegramBot, chat: Chat, e: Entry): SendResponse {
-        return bot.send(chat, printer.print(e)) { it.parseMode(ParseMode.HTML).disableWebPagePreview(false) }
+        return bot.send(chat, printer.print(e)) { parseMode(ParseMode.HTML).disableWebPagePreview(false) }
     }
 
     private fun sendLatest(bot: TelegramBot, chat: Chat, feed: Feed) {
@@ -44,7 +44,7 @@ class UncleBobCommand(private val printer: EntryPrinter) : MessageCommand("/uncl
 
     private fun sendFormatError(bot: TelegramBot, chat: Chat) {
         bot.send(chat, Sticker.HELP)
-        bot.send(chat, COMMAND_FORMAT_ERROR_MESSAGE) { it.parseMode(ParseMode.HTML).disableWebPagePreview(false) }
+        bot.send(chat, COMMAND_FORMAT_ERROR_MESSAGE) { parseMode(ParseMode.HTML).disableWebPagePreview(false) }
     }
 
     companion object : KLogging() {

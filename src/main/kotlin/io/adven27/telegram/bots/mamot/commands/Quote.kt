@@ -20,7 +20,7 @@ class QuoteCommand(private val messageFromURL: MessageFromURL) :
             text = "Связь с ноосферой потеряна..."
         }
         bot.send(chat.id(), sticker)
-        bot.send(chat, text) { it.disableWebPagePreview(true).parseMode(HTML) }
+        bot.send(chat, text) { disableWebPagePreview(true).parseMode(HTML) }
     }
 }
 
