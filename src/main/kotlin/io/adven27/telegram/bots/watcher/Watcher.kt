@@ -33,7 +33,8 @@ import kotlin.concurrent.fixedRateTimer
 @ConditionalOnProperty(prefix = "bot.watcher", name = ["enabled"], havingValue = "true", matchIfMissing = false)
 class Watcher(
     @Value("\${bot.watcher.token}") private val token: String,
-    @Value("\${bot.watcher.rate-minutes:15}") private val rateMinutes: Long,
+    @Value("\${bot.watcher.update.rate-minutes:15}") private val rateMinutes: Long,
+    @Value("\${bot.watcher.update.enabled:true}") private val updateEnabled: Boolean,
     @Value("\${bot.watcher.admin}") private val admin: Long,
     private val chatRepository: ChatRepository,
     private val scriptsRepository: ScriptsRepository,
@@ -42,14 +43,19 @@ class Watcher(
     val dbWizard: DbWizard = DbWizard()
 
     override fun start() {
+        logger.info("Starting Watcher...")
         with(TelegramBot(token)) {
-            fixedRateTimer("default", true, 0L, 1000 * 60 * rateMinutes) { updateItems() }
+            if (updateEnabled) {
+                fixedRateTimer("default", true, initialDelay =  0L, period = 1000 * 60 * rateMinutes) { updateItems() }
+            }
             setUpdatesListener { handle(it) }
         }
+        logger.info("Watcher stated")
     }
 
     private fun TelegramBot.updateItems() {
         try {
+            logger.info("Updating items...")
             chatRepository.findAll().forEach { chat ->
                 chatRepository.save(
                     chat.data
@@ -62,8 +68,9 @@ class Watcher(
                         }.let { chat.apply { data = it } }
                 )
             }
+            logger.info("Updating items finished")
         } catch (e: Exception) {
-            logger.error("Failed to refresh", e)
+            logger.error("Failed to update items", e)
         }
     }
 
