@@ -110,6 +110,7 @@ class Watcher(
             msg.text().let { it.startsWith("/start") || it.startsWith("/hello") } -> send(msg.chat(), introMessage)
             msg.text().startsWith("/list") -> list(msg.chat().id())
             msg.text().startsWith("/update") -> updateChat(msg.chat().id())
+            msg.fromAdmin() && msg.text().startsWith("/updateAll") -> updateChats()
             msg.fromAdmin() && msg.text().startsWith("/db") -> db()
             msg.fromAdmin() && msg.text().startsWith(DB_REMOVE) -> dbRemove(msg)
             msg.fromAdmin() && dbWizard.inProgress() -> dbInProgress(msg)
