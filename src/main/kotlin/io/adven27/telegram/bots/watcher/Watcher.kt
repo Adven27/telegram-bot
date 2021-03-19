@@ -64,25 +64,24 @@ class Watcher(
         logger.error("Failed to update chats", e)
     }
 
-    private fun TelegramBot.updateChat(chat: Chat) {
-        logger.info("Updating chat: $chat")
+    private fun TelegramBot.updateChat(info: Chat) {
+        logger.info("Updating chat: $info")
+        val data = info.data
+        val wishList = data.wishList!!
+        val items = wishList.items.map { item -> updateAndNotify(item, info.chatId) }.toSet()
+        //FIXME
         chatRepository.save(
-            chat.data.let {
-                it.copy(
-                    wishList = WishList(
-                        it.wishList!!.items
-                            .map { item -> updateAndNotify(item, chat) }
-                            .fold(listOf<Item>()) { r, i -> r + i }.toSet()
-                    )
-                )
-            }.let { chat.apply { data = it } }
+            info.copy(data = data.copy(wishList = WishList(emptySet())))
+        )
+        chatRepository.save(
+            info.copy(data = data.copy(wishList = WishList(items)))
         )
     }
 
     private fun TelegramBot.updateChat(chatId: Long) = chatRepository.findByChatId(chatId).ifPresent { updateChat(it) }
 
-    private fun TelegramBot.updateAndNotify(item: Item, chat: Chat): Item =
-        fetch(item.url).apply { notify(chat.chatId, item.price, this) }
+    private fun TelegramBot.updateAndNotify(item: Item, chatId: Long): Item =
+        fetch(item.url).apply { notify(chatId, item.price, this) }
 
     private fun TelegramBot.notify(user: Long, oldPrice: Double, item: Item) {
         fun Item.priceDown() = "Цена упала!\n<pre>${name}</pre>\nстоит: <u>${price}</u>\n\n$url"
@@ -204,7 +203,7 @@ class Watcher(
         scriptsRepository.deleteById(msg.text().substring(DB_REMOVE.length + 1).toLong())
 
     private fun TelegramBot.follow(url: String, msg: Message) {
-        logger.info("URL to follow [$url]")
+        logger.info("URL to follow [$url], chat ${msg.chat().id()}")
         val chatId = msg.chat().id()
         try {
             fetch(url).also {
