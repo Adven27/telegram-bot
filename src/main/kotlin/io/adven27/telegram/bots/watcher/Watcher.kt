@@ -245,19 +245,17 @@ class Watcher(
 }
 
 @Serializable
-data class Item(val url: String, var name: String = "-", var price: Double = 0.0, var quantity: Int = 0) : WithId(url) {
+data class Item(val url: String, var name: String = "-", var price: Double = 0.0, var quantity: Int = 0) {
     override fun equals(other: Any?): Boolean = when {
         this === other -> true
         javaClass != other?.javaClass -> false
         else -> id == (other as Item).id
     }
 
-    override fun hashCode(): Int = id.hashCode()
-}
+    val id: String
+        get() = UUID.nameUUIDFromBytes(url.toByteArray()).toString()
 
-@Serializable
-open class WithId(private val base: String) {
-    val id: String = UUID.nameUUIDFromBytes(base.toByteArray()).toString()
+    override fun hashCode(): Int = id.hashCode()
 }
 
 @JsonDeserialize(using = ItemDeserializer::class)
