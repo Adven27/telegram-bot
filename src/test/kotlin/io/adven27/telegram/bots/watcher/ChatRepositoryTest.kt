@@ -50,8 +50,8 @@ class ChatRepositoryTest {
             .hasSize(3)
             .extracting("chatId", "data", "blocked")
             .containsExactly(
-                tuple(11L, ChatData(WishList(setOf(Item("http")))), false),
-                tuple(22L, ChatData(WishList(setOf(Item("http1"), Item("http2")))), false),
+                tuple(11L, ChatData(WishList(listOf(Item("http")))), false),
+                tuple(22L, ChatData(WishList(listOf(Item("http1"), Item("http2")))), false),
                 tuple(33L, ChatData(), true),
             )
     }
@@ -61,13 +61,13 @@ class ChatRepositoryTest {
     fun `find by chatId`() {
         assertThat(sut.findByChatId(22)).get()
             .extracting("chatId", "data", "blocked")
-            .contains(22L, ChatData(WishList(setOf(Item("http1"), Item("http2")))), false)
+            .contains(22L, ChatData(WishList(listOf(Item("http1"), Item("http2")))), false)
     }
 
     @Test
     @ExpectedDatabase("/repo/expected-one.xml", table = "chats", assertionMode = NON_STRICT)
     fun save() {
-        sut.save(Chat(chatId = 123L, data = ChatData(WishList(setOf(Item(url = "http"))))))
+        sut.save(Chat(chatId = 123L, data = ChatData(WishList(listOf(Item(url = "http"))))))
     }
 }
 

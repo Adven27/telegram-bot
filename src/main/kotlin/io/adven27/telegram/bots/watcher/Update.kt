@@ -25,7 +25,9 @@ class ScriptNotFound(url: String) : RuntimeException("Script not found for url [
 
 @Suppress("UNCHECKED_CAST")
 fun <T> eval(script: String, context: Map<String, Any> = emptyMap()): T =
-    scriptEngine.apply { context.forEach { (k, v) -> put(k, v) } }.eval(script) as T
+    (scriptEngine.apply { context.forEach { (k, v) -> put(k, v) } }.eval(script) as T).also {
+        scriptEngine.state.history.reset()
+    }
 
 val scriptEngine =
     ScriptEngineManager().getEngineByExtension("kts").factory.scriptEngine as KotlinJsr223JvmLocalScriptEngine
