@@ -68,13 +68,8 @@ class Watcher(
         logger.info("Updating chat: $info")
         val data = info.data
         val wishList = data.wishList!!
-        val items = wishList.items.map { item -> updateAndNotify(item, info.chatId) }.toSet()
-        //FIXME
         chatRepository.save(
-            info.copy(data = data.copy(wishList = WishList(emptySet())))
-        )
-        chatRepository.save(
-            info.copy(data = data.copy(wishList = WishList(items)))
+            info.copy(data = data.copy(wishList = WishList(wishList.items.map { updateAndNotify(it, info.chatId) })))
         )
     }
 
@@ -149,7 +144,7 @@ class Watcher(
             chatRepository.save(
                 info.apply {
                     data = data.copy(
-                        wishList = wishList.copy(items = wishList.items.filter { it.id != id }.toSet())
+                        wishList = wishList.copy(items = wishList.items.filter { it.id != id })
                     )
                 }
             )
@@ -227,7 +222,7 @@ class Watcher(
                 chat.apply { data = data.copy(wishList = data.wishList!!.copy(items = data.wishList!!.items + result)) }
             )
         },
-        { chatRepository.save(Chat(chatId = chatId, data = ChatData(WishList(setOf(result))))) }
+        { chatRepository.save(Chat(chatId = chatId, data = ChatData(WishList(listOf(result))))) }
     )
 
     private fun listMarkup() = Keyboard(Button("↙️").callbackData(CB_LIST))
@@ -246,16 +241,8 @@ class Watcher(
 
 @Serializable
 data class Item(val url: String, var name: String = "-", var price: Double = 0.0, var quantity: Int = 0) {
-    override fun equals(other: Any?): Boolean = when {
-        this === other -> true
-        javaClass != other?.javaClass -> false
-        else -> id == (other as Item).id
-    }
-
     val id: String
         get() = UUID.nameUUIDFromBytes(url.toByteArray()).toString()
-
-    override fun hashCode(): Int = id.hashCode()
 }
 
 @JsonDeserialize(using = ItemDeserializer::class)
@@ -264,7 +251,7 @@ data class Item(val url: String, var name: String = "-", var price: Double = 0.0
 data class ChatData(val wishList: WishList? = null)
 
 @Serializable
-data class WishList(val items: Set<Item>)
+data class WishList(val items: List<Item>)
 
 class ItemDeserializer @JvmOverloads constructor(vc: Class<*>? = null) : StdDeserializer<ChatData?>(vc) {
     override fun deserialize(jp: JsonParser, ctxt: DeserializationContext?): ChatData =

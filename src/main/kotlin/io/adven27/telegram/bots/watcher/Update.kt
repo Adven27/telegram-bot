@@ -7,7 +7,8 @@ import org.springframework.web.reactive.function.client.WebClient
 import javax.script.ScriptEngineManager
 
 @Component
-class Scriptable(private val webClientBuilder: WebClient.Builder, private val provider: (String) -> String) : (String) -> Item {
+class Scriptable(private val webClientBuilder: WebClient.Builder, private val provider: (String) -> String) :
+        (String) -> Item {
     companion object : KLogging()
 
     override fun invoke(url: String): Item =
@@ -24,6 +25,7 @@ class ScriptNotFound(url: String) : RuntimeException("Script not found for url [
 
 @Suppress("UNCHECKED_CAST")
 fun <T> eval(script: String, context: Map<String, Any> = emptyMap()): T =
-    (ScriptEngineManager().getEngineByExtension("kts").factory.scriptEngine as KotlinJsr223JvmLocalScriptEngine).apply {
-        context.forEach { (k, v) -> put(k, v) }
-    }.eval(script) as T
+    scriptEngine.apply { context.forEach { (k, v) -> put(k, v) } }.eval(script) as T
+
+val scriptEngine =
+    ScriptEngineManager().getEngineByExtension("kts").factory.scriptEngine as KotlinJsr223JvmLocalScriptEngine
