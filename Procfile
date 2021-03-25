@@ -1,1 +1,1 @@
-web java -Dserver.port=$PORT $JAVA_OPTS -Dkotlin.script.classpath=build/libs/bots-0.0.1-all.jar  -jar build/libs/bots-0.0.1-all.jar
+worker: java -Dserver.port=$PORT $JAVA_OPTS -Dkotlin.script.classpath=build/libs/bots-0.0.1-all.jar  -jar build/libs/bots-0.0.1-all.jar
