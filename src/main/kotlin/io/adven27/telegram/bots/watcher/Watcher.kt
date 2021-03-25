@@ -83,7 +83,7 @@ class Watcher(
         fun Item.noMore() = "Похоже закончилось...${EMOJI_SAD}\n<pre>${name}</pre>\n\n$url"
         fun SendMessage.withMarkup() = replyMarkup(itemMarkup(item)).parseMode(HTML)
         when {
-            item.price < oldPrice -> send(user, item.priceDown()) { withMarkup() }
+            item.price != 0.0 && item.price < oldPrice -> send(user, item.priceDown()) { withMarkup() }
             item.price == 0.0 && oldPrice != 0.0 -> send(user, item.noMore()) { withMarkup() }
         }
     }

@@ -26,6 +26,7 @@ class ScriptNotFound(url: String) : RuntimeException("Script not found for url [
 @Suppress("UNCHECKED_CAST")
 fun <T> eval(script: String, context: Map<String, Any> = emptyMap()): T =
     (scriptEngine.apply { context.forEach { (k, v) -> put(k, v) } }.eval(script) as T).also {
+        //https://discuss.kotlinlang.org/t/embeddable-kotlin-compiler-memory-leaks/15731
         scriptEngine.state.history.reset()
     }
 
