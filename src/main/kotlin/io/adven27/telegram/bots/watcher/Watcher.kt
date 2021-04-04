@@ -15,7 +15,6 @@ import com.pengrad.telegrambot.model.CallbackQuery
 import com.pengrad.telegrambot.model.Message
 import com.pengrad.telegrambot.model.Update
 import com.pengrad.telegrambot.model.request.ParseMode.HTML
-import com.pengrad.telegrambot.request.SendMessage
 import io.adven27.telegram.bots.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -79,13 +78,21 @@ class Watcher(
         fetch(item.url).apply { notify(chatId, item.price, this) }
 
     private fun TelegramBot.notify(user: Long, oldPrice: Double, item: Item) {
+        notifyMessage(item, oldPrice).ifPresent { send(user, it) { replyMarkup(itemMarkup(item)).parseMode(HTML) } }
+    }
+
+    private fun notifyMessage(item: Item, oldPrice: Double): Optional<String> {
         fun Item.priceDown() = "Цена упала!\n<pre>${name}</pre>\nстоит: <u>${price}</u>\n\n$url"
         fun Item.noMore() = "Похоже закончилось...${EMOJI_SAD}\n<pre>${name}</pre>\n\n$url"
-        fun SendMessage.withMarkup() = replyMarkup(itemMarkup(item)).parseMode(HTML)
-        when {
-            item.price != 0.0 && item.price < oldPrice -> send(user, item.priceDown()) { withMarkup() }
-            item.price == 0.0 && oldPrice != 0.0 -> send(user, item.noMore()) { withMarkup() }
-        }
+        fun Item.appearAgain() = "Товар снова появился: \n<pre>${name}</pre>\n\n$url"
+        return Optional.ofNullable(
+            when {
+                item.price != 0.0 && oldPrice == 0.0 && item.notifyWhenBelow > item.price -> item.appearAgain()
+                item.price != 0.0 && item.price < oldPrice -> item.priceDown()
+                item.price == 0.0 && oldPrice != 0.0 -> item.noMore()
+                else -> null
+            }
+        )
     }
 
     private fun TelegramBot.handle(updates: MutableList<Update>): Int = updates.forEach {
@@ -121,8 +128,49 @@ class Watcher(
             cb.data() == CB_LIST -> listItems(cb.chatId(), cb.messageId())
             cb.data().startsWith(CB_OPEN) -> openItem(cb.chatId(), cb.messageId(), cb.targetId(CB_OPEN))
             cb.data().startsWith(CB_DEL) -> deleteItem(cb.chatId(), cb.messageId(), cb.targetId(CB_DEL))
+            cb.data().startsWith(CB_FOLLOW_RULE_50) -> rule(
+                cb.chatId(),
+                cb.messageId(),
+                cb.targetId(CB_FOLLOW_RULE_50),
+                NotificationRule.RULE_50
+            )
+            cb.data().startsWith(CB_FOLLOW_RULE_25) -> rule(
+                cb.chatId(),
+                cb.messageId(),
+                cb.targetId(CB_FOLLOW_RULE_25),
+                NotificationRule.RULE_25
+            )
+            cb.data().startsWith(CB_FOLLOW_RULE_10) -> rule(
+                cb.chatId(),
+                cb.messageId(),
+                cb.targetId(CB_FOLLOW_RULE_10),
+                NotificationRule.RULE_10
+            )
+            cb.data().startsWith(CB_FOLLOW_RULE_ANY) -> rule(
+                cb.chatId(),
+                cb.messageId(),
+                cb.targetId(CB_FOLLOW_RULE_ANY),
+                NotificationRule.RULE_ANY
+            )
         }
     }
+
+    private fun TelegramBot.rule(chatId: Long, messageId: Int, itemId: String, rule: NotificationRule) {
+        chatRepository.findByChatId(chatId).ifPresent { info ->
+            val data = info.data
+            val wishList = data.wishList!!
+            chatRepository.save(
+                info.copy(data = data.copy(wishList = WishList(wishList.items.map {
+                    if (it.id == itemId) it.apply {
+                        notifyWhenBelow = discount(rule.discount, price)
+                        edit(chatId, messageId, itemViewMessage(it)) { replyMarkup(itemMarkup(it)) }
+                    } else it
+                })))
+            )
+        }
+    }
+
+    private fun discount(discount: Int, price: Double) = if (discount == 0) price else price * (100 - discount) / 100
 
     private fun TelegramBot.listItems(chatId: Long, messageId: Int) = listItems(chatId).ifPresent { pair ->
         edit(chatId, messageId, "Вот за чем я слежу:") { replyMarkup(pair.second) }
@@ -132,11 +180,18 @@ class Watcher(
         chatRepository.findByChatId(chatId)
             .map { info -> info.data.wishList?.items?.find { it.id == id } }
             .map { item ->
-                edit(chatId, messageId, "${item!!.name}\nЦена: ${item.price}\nКол-во: ${item.quantity}\n${item.url}") {
-                    replyMarkup(itemMarkup(item))
-                }
+                edit(chatId, messageId, itemViewMessage(item!!)) { replyMarkup(itemMarkup(item)) }
             }
     }
+
+    private fun itemViewMessage(item: Item) = """${item.name}
+       |Цена: ${item.price}
+       |Кол-во: ${item.quantity}
+       |Уведомлять, когда цена ниже: ${notifyWhenMessage(item)}
+       |${item.url}""".trimMargin()
+
+    private fun notifyWhenMessage(item: Item) =
+        if (item.notifyWhenBelow == 0.0) "текущей" else item.notifyWhenBelow
 
     private fun TelegramBot.deleteItem(chatId: Long, messageId: Int, id: String) {
         chatRepository.findByChatId(chatId).ifPresent { info ->
@@ -156,6 +211,12 @@ class Watcher(
 
     private fun itemMarkup(item: Item) = Keyboard(
         arrayOf(Button(EMOJI_GLOBE).url(item.url), Button(EMOJI_DEL).callbackData("$CB_DEL${item.id}")),
+        arrayOf(
+            Button("50%").callbackData("$CB_FOLLOW_RULE_50${item.id}"),
+            Button("25%").callbackData("$CB_FOLLOW_RULE_25${item.id}"),
+            Button("10%").callbackData("$CB_FOLLOW_RULE_10${item.id}"),
+            Button("any").callbackData("$CB_FOLLOW_RULE_ANY${item.id}"),
+        ),
         arrayOf(Button(EMOJI_BACK).callbackData(CB_LIST))
     )
 
@@ -203,8 +264,8 @@ class Watcher(
         try {
             fetch(url).also {
                 saveItem(chatId, it)
-                send(chatId, "ОК! Буду следить.\n<pre>${it.name}</pre>\nстоит: <u>${it.price}</u>") {
-                    replyToMessageId(msg.messageId()).replyMarkup(listMarkup()).parseMode(HTML)
+                send(chatId, followMessage(it)) {
+                    replyToMessageId(msg.messageId()).replyMarkup(followMarkup(it)).parseMode(HTML)
                 }
             }
         } catch (nf: ScriptNotFound) {
@@ -216,6 +277,12 @@ class Watcher(
         }
     }
 
+    private fun followMessage(it: Item) =
+        """ОК! Буду следить.
+           |<pre>${it.name}</pre>
+           |стоит: <u>${it.price}</u>
+           |Уведомлять, когда цена ниже: ${notifyWhenMessage(it)}""".trimMargin()
+
     private fun saveItem(chatId: Long, result: Item) = chatRepository.findByChatId(chatId).ifPresentOrElse(
         { chat ->
             chatRepository.save(
@@ -225,9 +292,21 @@ class Watcher(
         { chatRepository.save(Chat(chatId = chatId, data = ChatData(WishList(listOf(result))))) }
     )
 
-    private fun listMarkup() = Keyboard(Button("↙️").callbackData(CB_LIST))
+    private fun followMarkup(item: Item) = Keyboard(
+        arrayOf(
+            Button("50%").callbackData("$CB_FOLLOW_RULE_50${item.id}"),
+            Button("25%").callbackData("$CB_FOLLOW_RULE_25${item.id}"),
+            Button("10%").callbackData("$CB_FOLLOW_RULE_10${item.id}"),
+            Button("any").callbackData("$CB_FOLLOW_RULE_ANY${item.id}"),
+        ),
+        arrayOf(Button("↙️").callbackData(CB_LIST))
+    )
 
     companion object : KLogging() {
+        const val CB_FOLLOW_RULE_ANY = "rule#"
+        const val CB_FOLLOW_RULE_50 = "rule50#"
+        const val CB_FOLLOW_RULE_25 = "rule25#"
+        const val CB_FOLLOW_RULE_10 = "rule10#"
         const val CB_LIST = "list"
         const val CB_OPEN = "open#"
         const val CB_DEL = "del#"
@@ -240,9 +319,22 @@ class Watcher(
 }
 
 @Serializable
-data class Item(val url: String, var name: String = "-", var price: Double = 0.0, var quantity: Int = 0) {
+data class Item(
+    val url: String,
+    var name: String = "-",
+    var price: Double = 0.0,
+    var quantity: Int = 0,
+    var notifyWhenBelow: Double = 0.0,
+) {
     val id: String
         get() = UUID.nameUUIDFromBytes(url.toByteArray()).toString()
+}
+
+enum class NotificationRule(val discount: Int = 0) {
+    RULE_50(50),
+    RULE_25(25),
+    RULE_10(10),
+    RULE_ANY(0),
 }
 
 @JsonDeserialize(using = ItemDeserializer::class)
