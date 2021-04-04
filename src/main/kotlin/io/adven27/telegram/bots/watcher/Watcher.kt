@@ -187,11 +187,11 @@ class Watcher(
     private fun itemViewMessage(item: Item) = """${item.name}
        |Цена: ${item.price}
        |Кол-во: ${item.quantity}
-       |Уведомлять, когда цена ниже: ${notifyWhenMessage(item)}
+       |$EMOJI_ALERT Уведомлять, когда цена ниже: ${notifyWhenMessage(item)}
        |${item.url}""".trimMargin()
 
     private fun notifyWhenMessage(item: Item) =
-        if (item.notifyWhenBelow == 0.0) "текущей" else item.notifyWhenBelow
+        if (item.notifyWhenBelow == item.price || item.notifyWhenBelow == 0.0) "текущей" else item.notifyWhenBelow
 
     private fun TelegramBot.deleteItem(chatId: Long, messageId: Int, id: String) {
         chatRepository.findByChatId(chatId).ifPresent { info ->
@@ -211,13 +211,15 @@ class Watcher(
 
     private fun itemMarkup(item: Item) = Keyboard(
         arrayOf(Button(EMOJI_GLOBE).url(item.url), Button(EMOJI_DEL).callbackData("$CB_DEL${item.id}")),
-        arrayOf(
-            Button("50%").callbackData("$CB_FOLLOW_RULE_50${item.id}"),
-            Button("25%").callbackData("$CB_FOLLOW_RULE_25${item.id}"),
-            Button("10%").callbackData("$CB_FOLLOW_RULE_10${item.id}"),
-            Button("any").callbackData("$CB_FOLLOW_RULE_ANY${item.id}"),
-        ),
+        notifyRuleButtons(item),
         arrayOf(Button(EMOJI_BACK).callbackData(CB_LIST))
+    )
+
+    private fun notifyRuleButtons(item: Item) = arrayOf(
+        Button("$EMOJI_ALERT 50% $EMOJI_DROP").callbackData("$CB_FOLLOW_RULE_50${item.id}"),
+        Button("$EMOJI_ALERT 25% $EMOJI_DROP").callbackData("$CB_FOLLOW_RULE_25${item.id}"),
+        Button("$EMOJI_ALERT 10% $EMOJI_DROP").callbackData("$CB_FOLLOW_RULE_10${item.id}"),
+        Button("$EMOJI_ALERT %0 $EMOJI_DROP").callbackData("$CB_FOLLOW_RULE_ANY${item.id}"),
     )
 
     private fun CallbackQuery.targetId(anchor: String) = data().substring(anchor.length)
@@ -281,7 +283,7 @@ class Watcher(
         """ОК! Буду следить.
            |<pre>${it.name}</pre>
            |стоит: <u>${it.price}</u>
-           |Уведомлять, когда цена ниже: ${notifyWhenMessage(it)}""".trimMargin()
+           |$EMOJI_ALERT Уведомлять, когда цена ниже: ${notifyWhenMessage(it)}""".trimMargin()
 
     private fun saveItem(chatId: Long, result: Item) = chatRepository.findByChatId(chatId).ifPresentOrElse(
         { chat ->
@@ -293,12 +295,7 @@ class Watcher(
     )
 
     private fun followMarkup(item: Item) = Keyboard(
-        arrayOf(
-            Button("50%").callbackData("$CB_FOLLOW_RULE_50${item.id}"),
-            Button("25%").callbackData("$CB_FOLLOW_RULE_25${item.id}"),
-            Button("10%").callbackData("$CB_FOLLOW_RULE_10${item.id}"),
-            Button("any").callbackData("$CB_FOLLOW_RULE_ANY${item.id}"),
-        ),
+        notifyRuleButtons(item),
         arrayOf(Button("↙️").callbackData(CB_LIST))
     )
 
@@ -315,6 +312,8 @@ class Watcher(
         const val EMOJI_DEL = "❌"
         const val EMOJI_BACK = "\uD83D\uDD19"
         const val EMOJI_SAD = "\uD83D\uDE1E"
+        const val EMOJI_ALERT = "\uD83D\uDD14"
+        const val EMOJI_DROP = "\uD83D\uDCC9"
     }
 }
 
