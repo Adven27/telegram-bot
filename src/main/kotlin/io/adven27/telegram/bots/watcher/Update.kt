@@ -7,12 +7,11 @@ import org.springframework.web.reactive.function.client.WebClient
 import javax.script.ScriptEngineManager
 
 @Component
-class Scriptable(private val webClientBuilder: WebClient.Builder, private val provider: (String) -> String) :
-        (String) -> Item {
+class Scriptable(private val webClient: WebClient, private val provider: (String) -> String) : (String) -> Item {
     companion object : KLogging()
 
     override fun invoke(url: String): Item =
-        eval(provider(url), mapOf("url" to url, "logger" to logger, "webClient" to webClientBuilder.build()))
+        eval(provider(url), mapOf("url" to url, "logger" to logger, "webClient" to webClient))
 }
 
 @Component
@@ -26,7 +25,7 @@ class ScriptNotFound(url: String) : RuntimeException("Script not found for url [
 @Suppress("UNCHECKED_CAST")
 fun <T> eval(script: String, context: Map<String, Any> = emptyMap()): T =
     (scriptEngine.apply { context.forEach { (k, v) -> put(k, v) } }.eval(script) as T).also {
-        //https://discuss.kotlinlang.org/t/embeddable-kotlin-compiler-memory-leaks/15731
+        // https://discuss.kotlinlang.org/t/embeddable-kotlin-compiler-memory-leaks/15731
         scriptEngine.state.history.reset()
     }
 

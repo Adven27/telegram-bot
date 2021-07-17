@@ -15,4 +15,7 @@ class WebClientConfig {
     ).exchangeStrategies(
         ExchangeStrategies.builder().codecs { it.defaultCodecs().maxInMemorySize(16 * 1024 * 1024) }.build()
     )
+
+    @Bean
+    fun webClient(builder: WebClient.Builder): WebClient = builder.build()
 }
